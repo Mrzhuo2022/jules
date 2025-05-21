@@ -1,50 +1,61 @@
 # ai_services/custom_api_service.py
 import requests
-import os # For potentially getting API details from environment variables in the future
+import os
 
-# Import configuration from app.py.
-# This creates a slight coupling but is simpler for this example.
-# A more advanced setup might use a dedicated config module or Flask's app.config.
 try:
     from app import CUSTOM_API_URL, CUSTOM_API_KEY
 except ImportError:
-    # Fallback if running this module directly or app is not in PYTHONPATH
-    # In a real application, manage configurations more robustly.
     CUSTOM_API_URL = os.environ.get("CUSTOM_API_URL", "YOUR_API_URL_HERE_FALLBACK")
     CUSTOM_API_KEY = os.environ.get("CUSTOM_API_KEY", "YOUR_API_KEY_HERE_FALLBACK")
 
-def get_response(user_message: str) -> str:
+def get_response(user_message: str, history: list) -> str:
     """
-    Processes the user's message by calling a custom external API
-    and returns the AI's response.
+    Processes the user's message by calling a custom external API,
+    including conversation history, and returns the AI's response.
 
     Args:
-        user_message: The message string from the user.
+        user_message: The current message string from the user.
+        history: A list of previous message exchanges.
+                 Each element is a dictionary e.g., {'user': 'message', 'bot': 'reply'}.
 
     Returns:
         A string containing the AI's response from the custom API,
         or a fallback message if an error occurs.
     """
-    if not CUSTOM_API_URL or CUSTOM_API_URL == "YOUR_API_URL_HERE":
+    if not CUSTOM_API_URL or CUSTOM_API_URL == "YOUR_API_URL_HERE" or CUSTOM_API_URL == "YOUR_API_URL_HERE_FALLBACK":
         return "Error: Custom API URL is not configured."
 
     headers = {
         "Content-Type": "application/json",
     }
-    if CUSTOM_API_KEY and CUSTOM_API_KEY != "YOUR_API_KEY_HERE":
-        # Assuming Bearer token authentication as a common example
+    if CUSTOM_API_KEY and CUSTOM_API_KEY != "YOUR_API_KEY_HERE" and CUSTOM_API_KEY != "YOUR_API_KEY_HERE_FALLBACK":
         headers["Authorization"] = f"Bearer {CUSTOM_API_KEY}"
-        # Alternatively, for X-API-Key:
-        # headers["X-API-Key"] = CUSTOM_API_KEY
 
-    # Assuming the API expects a JSON payload with a "query" field
-    payload = {"query": user_message}
+    # Adapt history to the format [{"role": "user", "content": "..."}, {"role": "assistant", "content": "..."}]
+    formatted_history = []
+    for exchange in history:
+        if exchange.get('user'):
+            formatted_history.append({"role": "user", "content": exchange['user']})
+        if exchange.get('bot'):
+            formatted_history.append({"role": "assistant", "content": exchange['bot']})
+    
+    # The payload structure depends on the custom API.
+    # Common patterns include sending history as a list of messages.
+    # Here, we send the current message as "query" and history separately.
+    # Some APIs might prefer the current message to be the last item in the history list.
+    payload = {
+        "query": user_message,
+        "history": formatted_history 
+    }
+    # Alternative payload if API expects current message within history:
+    # formatted_history.append({"role": "user", "content": user_message})
+    # payload = {"messages": formatted_history}
+
 
     try:
         response = requests.post(CUSTOM_API_URL, json=payload, headers=headers, timeout=10)
-        response.raise_for_status()  # Raise an exception for HTTP errors (4xx or 5xx)
+        response.raise_for_status()
 
-        # Assuming the API returns JSON with an "answer" field
         api_response_json = response.json()
         bot_reply = api_response_json.get("answer")
 
@@ -71,29 +82,14 @@ def get_response(user_message: str) -> str:
         return "Sorry, I received an invalid response from the AI service."
 
 if __name__ == '__main__':
-    # Example usage (for testing this module directly)
-    # You would need to set CUSTOM_API_URL and potentially CUSTOM_API_KEY
-    # or ensure app.py is in PYTHONPATH for the import to work.
-    
-    # For testing with a mock API:
-    # CUSTOM_API_URL = "https://jsonplaceholder.typicode.com/posts" # This API expects a different payload and returns different JSON
-    # CUSTOM_API_KEY = ""
-    
-    # Test case for jsonplaceholder (it doesn't use "query" or return "answer" directly)
-    # If CUSTOM_API_URL is jsonplaceholder, the current payload/response parsing will "fail" gracefully.
-    # To test jsonplaceholder properly, you'd adjust payload and response parsing:
-    # payload = {"title": "foo", "body": "bar", "userId": 1}
-    # then in response handling: bot_reply = api_response_json.get("title") + " " + str(api_response_json.get("id"))
-
-    # print(get_response("Tell me a joke about APIs."))
-    
-    # Example with a hypothetical correct API:
     if CUSTOM_API_URL != "YOUR_API_URL_HERE_FALLBACK" and CUSTOM_API_URL != "YOUR_API_URL_HERE":
         print(f"Testing with CUSTOM_API_URL: {CUSTOM_API_URL}")
-        test_message = "Hello from custom_api_service test!"
-        print(f"Sending: {test_message}")
-        print(f"Received: {get_response(test_message)}")
+        test_message = "What was the first thing I said?"
+        test_history = [
+            {"user": "My name is Bob.", "bot": "Nice to meet you, Bob!"},
+            {"user": "What is my name?", "bot": "Your name is Bob."}
+        ]
+        print(f"Sending: {test_message} with history: {test_history}")
+        print(f"Received: {get_response(test_message, test_history)}")
     else:
         print("Please configure CUSTOM_API_URL in this file (or via app.py/environment) to test.")
-
-    # Note: To run this test, you'll need to install requests: pip install requests

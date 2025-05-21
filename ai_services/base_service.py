@@ -1,12 +1,15 @@
 # This file conceptually defines the interface for AI services.
 # All AI service modules should provide a function with the following signature:
 #
-# def get_response(user_message: str) -> str:
+# def get_response(user_message: str, history: list) -> str:
 #     """
-#     Processes the user's message and returns the AI's response.
+#     Processes the user's message, considering the conversation history,
+#     and returns the AI's response.
 #
 #     Args:
-#         user_message: The message string from the user.
+#         user_message: The current message string from the user.
+#         history: A list of previous message exchanges.
+#                  Each element is a dictionary e.g., {'user': 'message', 'bot': 'reply'}.
 #
 #     Returns:
 #         A string containing the AI's response.
